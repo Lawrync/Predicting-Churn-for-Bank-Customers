@@ -1,94 +1,97 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
-# streamlit_app.py
 import streamlit as st
 import pandas as pd
-import joblib
-import os
+from xgboost import XGBClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
 
-# ==== Load model & preprocessor with caching ====
-@st.cache(allow_output_mutation=True)
-def load_model_and_preprocessor():
-    file_dir = os.path.dirname(__file__)  # ensures relative path
-    preprocessor_path = os.path.join(file_dir, "preprocessor.pkl")
-    model_path = os.path.join(file_dir, "xgb_churn_model.pkl")
-    
-    try:
-        preprocessor = joblib.load(preprocessor_path)
-    except FileNotFoundError:
-        st.error(f"Preprocessor file not found at {preprocessor_path}")
-        return None, None
-    
-    try:
-        model = joblib.load(model_path)
-    except FileNotFoundError:
-        st.error(f"Model file not found at {model_path}")
-        return None, None
+# Load the dataset
+@st.cache_data
+def load_data():
+    return pd.read_csv("Customer-Churn-Records.csv")
 
-    return preprocessor, model
+# Preprocess the data
+def preprocess_data(df):
+    X = df.drop(['RowNumber', 'CustomerId', 'Surname', 'Exited',
+                 'Complain', 'Satisfaction Score', 'Point Earned'], axis=1)
+    y = df['Exited']
 
-# ==== Main app function ====
+    numeric_features = ['CreditScore', 'Age', 'Tenure', 'Balance',
+                        'NumOfProducts', 'HasCrCard', 'IsActiveMember',
+                        'EstimatedSalary']
+    categorical_features = ['Geography', 'Gender', 'Card Type']
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', StandardScaler(), numeric_features),
+            ('cat', OneHotEncoder(drop='first'), categorical_features)
+        ]
+    )
+
+    X_processed = preprocessor.fit_transform(X)
+    return X_processed, y, preprocessor
+
+# Train the model
+def train_model(X, y):
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+    model = XGBClassifier(objective="binary:logistic", eval_metric="auc", random_state=42)
+    model.fit(X_train, y_train)
+    return model
+
+# Main app
 def main():
-    st.set_page_config(page_title="Customer Churn Predictor", layout="centered")
-    st.title("📊 Customer Churn Prediction App")
-    st.write("Enter customer details below to predict churn probability.")
+    st.title("💳 Customer Churn Prediction")
 
-    # Load preprocessor and model
-    preprocessor, model = load_model_and_preprocessor()
-    if preprocessor is None or model is None:
-        st.stop()  # stop if files not loaded
+    # Load and preprocess data
+    data = load_data()
+    X, y, preprocessor = preprocess_data(data)
 
-    # Sidebar for input parameters
-    st.sidebar.header("Enter Customer Details")
-    credit_score = st.sidebar.number_input("Credit Score", 350, 850, 600)
-    age = st.sidebar.number_input("Age", 18, 92, 30)
-    tenure = st.sidebar.number_input("Tenure (Years with Bank)", 0, 10, 2)
-    balance = st.sidebar.number_input("Balance", 0.0, 250000.0, 8000.0, step=100.0)
-    num_products = st.sidebar.selectbox("Number of Products", [1, 2, 3, 4], index=1)
-    has_card = st.sidebar.radio("Has Credit Card?", [0, 1], index=1)
-    is_active = st.sidebar.radio("Is Active Member?", [0, 1], index=1)
+    # Train model
+    model = train_model(X, y)
+
+    # Sidebar inputs
+    st.sidebar.title("Enter Customer Information")
+    credit_score = st.sidebar.slider("Credit Score", 300, 900, 600)
+    age = st.sidebar.slider("Age", 18, 100, 30)
+    tenure = st.sidebar.slider("Tenure (Years with Bank)", 0, 10, 3)
+    balance = st.sidebar.number_input("Balance", 0.0, 250000.0, 50000.0, step=100.0)
+    num_products = st.sidebar.selectbox("Number of Products", [1, 2, 3, 4], index=0)
+    has_card = st.sidebar.selectbox("Has Credit Card?", ["Yes", "No"])
+    is_active = st.sidebar.selectbox("Is Active Member?", ["Yes", "No"])
     salary = st.sidebar.number_input("Estimated Salary", 0.0, 200000.0, 60000.0, step=500.0)
     geography = st.sidebar.selectbox("Geography", ["France", "Spain", "Germany"])
-    gender = st.sidebar.selectbox("Gender", ["Female", "Male"])
-    card_type = st.sidebar.selectbox("Card Type", ["SILVER", "GOLD", "PLATINUM", "DIAMOND"])
+    gender = st.sidebar.selectbox("Gender", ["Male", "Female"])
+    card_type = st.sidebar.selectbox("Card Type", ["DIAMOND", "GOLD", "PLATINUM", "SILVER"])
 
-    # Predict button
-    if st.sidebar.button("🔮 Predict Churn"):
-        # Prepare data for prediction
-        sample = pd.DataFrame([{
-            "CreditScore": credit_score,
-            "Age": age,
-            "Tenure": tenure,
-            "Balance": balance,
-            "NumOfProducts": num_products,
-            "HasCrCard": has_card,
-            "IsActiveMember": is_active,
-            "EstimatedSalary": salary,
-            "Geography": geography,
-            "Gender": gender,
-            "Card_Type": card_type
-        }])
+    # Prepare input
+    input_data = pd.DataFrame([{
+        "CreditScore": credit_score,
+        "Age": age,
+        "Tenure": tenure,
+        "Balance": balance,
+        "NumOfProducts": num_products,
+        "HasCrCard": 1 if has_card == "Yes" else 0,
+        "IsActiveMember": 1 if is_active == "Yes" else 0,
+        "EstimatedSalary": salary,
+        "Geography": geography,
+        "Gender": gender,
+        "Card Type": card_type
+    }])
 
-        try:
-            # Transform and predict
-            X = preprocessor.transform(sample)
-            proba = model.predict_proba(X)[0][1]
-            pred = model.predict(X)[0]
+    # Transform and predict
+    input_processed = preprocessor.transform(input_data)
+    prediction = model.predict(input_processed)
+    probability = model.predict_proba(input_processed)[0][1]
 
-            # Display results
-            st.subheader("✅ Prediction Result")
-            if pred:
-                st.error(f"🔴 Customer is likely to churn! Probability: {proba:.2%}")
-            else:
-                st.success(f"🟢 Customer is unlikely to churn. Probability: {proba:.2%}")
-        except ValueError as e:
-            st.error(f"Error during prediction. Check input format: {e}")
+    # Display prediction
+    st.subheader("Prediction Result")
+    if prediction[0] == 1:
+        st.error(f" Customer is likely to churn. Probability: {probability:.2%}")
+    else:
+        st.success(f" Customer is not likely to churn. Probability: {probability:.2%}")
 
-# ==== Run the app ====
 if __name__ == "__main__":
     main()
 
