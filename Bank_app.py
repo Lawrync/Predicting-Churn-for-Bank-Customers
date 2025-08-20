@@ -56,7 +56,7 @@ has_cr_card = 1 if has_cr_card == "Yes" else 0
 is_active_member = 1 if is_active_member == "Yes" else 0
 gender = 1 if gender == "Male" else 0
 
-# Geography encoding
+# Geography encoding (One-Hot)
 geo_france = 1 if geography == "France" else 0
 geo_spain = 1 if geography == "Spain" else 0
 geo_germany = 1 if geography == "Germany" else 0
@@ -103,7 +103,13 @@ if st.button("🔍 Predict Churn"):
 # -----------------------------
 st.markdown("---")
 st.caption("📊 Built with Streamlit | Customer Churn Prediction Model")
-ain__":
+
+# -----------------------------
+# Entry Point (Fix for SyntaxError)
+# -----------------------------
+if __name__ == "__main__":
+    st.write("✅ App loaded successfully. Ready for predictions!")
+__":
     main()
 ion==1 else 'Retain'}**")
 
