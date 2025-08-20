@@ -6,8 +6,8 @@ from PIL import Image
 st.set_page_config(page_title="Customer Churn Prediction", layout="wide")
 
 # Load images
-img1 = Image.open("large-corporates-will-never-be-allowed-to-open-a-bank-in-india-n-vaghul.jpg")
-img2 = Image.open("interior-design-bank-office-employees-600nw-2307454537.jpg")
+img1 = Image.open("large-corporates-will-never-be-allowed-to-open-a-bank-in-india-n-vaghul.webp")
+img2 = Image.open("interior-design-bank-office-employees-600nw-2307454537.webp")
 
 # Display images: first on left, second in center
 col1, col2, col3 = st.columns([1, 2, 1])
