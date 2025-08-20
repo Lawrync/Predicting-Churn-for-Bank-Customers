@@ -1,78 +1,97 @@
 import streamlit as st
 import pickle
-import pandas as pd
+import numpy as np
 import os
-from PIL import Image
 
-# Load model & preprocessor
-MODEL_PATH = "models/churn_model.pkl"
-PREPROCESSOR_PATH = "models/preprocessor.pkl"
+# ---------------------------
+# Paths to model + preprocessor
+# --------------------------
+MODEL_PATH = os.path.join("models", "churn_model.pkl")
+PREPROCESSOR_PATH = os.path.join("models", "preprocessor.pkl")
 
-with open(MODEL_PATH, "rb") as f:
-    model = pickle.load(f)
-with open(PREPROCESSOR_PATH, "rb") as f:
-    preprocessor = pickle.load(f)
+if not os.path.exists(MODEL_PATH):  # fallback if in root
+    MODEL_PATH = "churn_model.pkl"
+if not os.path.exists(PREPROCESSOR_PATH):
+    PREPROCESSOR_PATH = "preprocessor.pkl"
 
-# Image folder
-IMAGE_FOLDER = "images"
-img1 = Image.open(os.path.join(IMAGE_FOLDER, "large-corporates-will-never-be-allowed-to-open-a-bank-in-india-n-vaghul.webp"))
-img2 = Image.open(os.path.join(IMAGE_FOLDER, "interior-design-bank-office-employees-600nw-2307454537.webp"))
+# ---------------------------
+# Load model + preprocessor
+# ---------------------------
+@st.cache_resource
+def load_model():
+    with open(MODEL_PATH, "rb") as f:
+        model = pickle.load(f)
+    with open(PREPROCESSOR_PATH, "rb") as f:
+        preprocessor = pickle.load(f)
+    return model, preprocessor
 
-# Main function
+model, preprocessor = load_model()
+
+# ---------------------------
+# Streamlit App
+# ---------------------------
 def main():
     st.set_page_config(page_title="Bank Customer Churn Prediction", layout="wide")
 
-    # Layout with two columns
-    col1, col2 = st.columns([2, 3])
+    st.title("🏦 Bank Customer Churn Prediction")
+    st.markdown("Enter customer details below to predict **whether they will Churn or Stay**.")
+
+    # --- Organize inputs in 3 columns
+    st.subheader("👤 Customer Information")
+    col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.image(img1, caption="Bank Exterior", use_container_width=True)
-        st.image(img2, caption="Bank Interior", use_container_width=True)
-
+        credit_score = st.number_input("Credit Score", min_value=300, max_value=900, value=600)
+        geography = st.selectbox("Geography", ["France", "Spain", "Germany"])
+        gender = st.selectbox("Gender", ["Male", "Female"])
     with col2:
-        st.title("🏦 Bank Customer Churn Prediction App")
-        st.write("Enter customer details to predict whether they are likely to churn or stay.")
+        age = st.number_input("Age", min_value=18, max_value=100, value=35)
+        tenure = st.number_input("Tenure (Years with Bank)", min_value=0, max_value=50, value=5)
+        balance = st.number_input("Balance", min_value=0.0, max_value=250000.0, value=50000.0)
+    with col3:
+        num_products = st.number_input("Number of Products", min_value=1, max_value=4, value=1)
+        has_cr_card = st.selectbox("Has Credit Card?", ["Yes", "No"])
+        is_active_member = st.selectbox("Is Active Member?", ["Yes", "No"])
+        estimated_salary = st.number_input("Estimated Salary", min_value=0.0, max_value=200000.0, value=50000.0)
 
-        # Inputs side-by-side
-        c1, c2 = st.columns(2)
-        with c1:
-            credit_score = st.number_input("Credit Score", min_value=300, max_value=900, value=600)
-            age = st.number_input("Age", min_value=18, max_value=100, value=35)
-            tenure = st.number_input("Tenure (years)", min_value=0, max_value=20, value=5)
-            balance = st.number_input("Balance", min_value=0.0, value=50000.0, format="%.2f")
+    # --- Create input array
+    input_data = np.array([[
+        credit_score,
+        geography,
+        gender,
+        age,
+        tenure,
+        balance,
+        num_products,
+        1 if has_cr_card == "Yes" else 0,
+        1 if is_active_member == "Yes" else 0,
+        estimated_salary
+    ]], dtype=object)
 
-        with c2:
-            num_products = st.number_input("Number of Products", min_value=1, max_value=4, value=1)
-            has_cr_card = st.selectbox("Has Credit Card", [0, 1])
-            is_active_member = st.selectbox("Is Active Member", [0, 1])
-            estimated_salary = st.number_input("Estimated Salary", min_value=0.0, value=50000.0, format="%.2f")
+    # --- Prediction button
+    if st.button("🔮 Predict Churn", use_container_width=True):
+        input_processed = preprocessor.transform(input_data)
+        prediction = model.predict(input_processed)[0]
+        prob = model.predict_proba(input_processed)[0]
 
-        # Combine inputs
-        input_data = pd.DataFrame([[
-            credit_score, age, tenure, balance, num_products,
-            has_cr_card, is_active_member, estimated_salary
-        ]], columns=[
-            "CreditScore", "Age", "Tenure", "Balance",
-            "NumOfProducts", "HasCrCard", "IsActiveMember", "EstimatedSalary"
-        ])
+        churn_prob = prob[1] * 100
+        retain_prob = prob[0] * 100
 
-        # 🔹 Prediction button & logic (this is what you were missing)
-        if st.button("Predict"):
-            input_processed = preprocessor.transform(input_data)
-            prediction = model.predict(input_processed)[0]
-            prob = model.predict_proba(input_processed)[0]
+        # Highlight output
+        if prediction == 1:
+            st.error(f"### ❌ Customer is likely to CHURN\nChurn Probability: **{churn_prob:.2f}%**")
+        else:
+            st.success(f"### ✅ Customer is likely to STAY\nRetention Probability: **{retain_prob:.2f}%**")
 
-            churn_prob = prob[1] * 100
-            retain_prob = prob[0] * 100
+        # Show probability breakdown
+        st.progress(churn_prob / 100)
+        st.write(f"🔴 **Churn:** {churn_prob:.2f}%")
+        st.write(f"🟢 **Stay:** {retain_prob:.2f}%")
 
-            if prediction == 1:
-                st.error(f"**Predicted Value: Churn** ❌")
-            else:
-                st.success(f"**Predicted Value: Retain** ✅")
 
-            st.write(f"🔴 Probability (Churn): {churn_prob:.2f}%")
-            st.write(f"🟢 Probability (Retain): {retain_prob:.2f}%")
-            st.info(f"**Final Output: {'Churn' if prediction==1 else 'Retain'}**")
+if __name__ == "__main__":
+    main()
+ion==1 else 'Retain'}**")
 
 # Run app
 if __name__ == "__main__":
