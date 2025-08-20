@@ -1,44 +1,51 @@
 import streamlit as st
 import pandas as pd
+import pickle
+from xgboost import XGBClassifier
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import train_test_split
 from PIL import Image
 import os
-from sklearn.ensemble import RandomForestClassifier
 
-# --- Streamlit page config ---
-st.set_page_config(page_title="Customer Churn Prediction", layout="wide")
-
-# --- Image paths ---
+# --- Display images side by side ---
 IMAGE_FOLDER = "images"
-img1_path = os.path.join(IMAGE_FOLDER, "large-corporates-will-never-be-allowed-to-open-a-bank-in-india-n-vaghul.webp")
-img2_path = os.path.join(IMAGE_FOLDER, "interior-design-bank-office-employees-600nw-2307454537.webp")
-
-img1 = Image.open(img1_path)
-img2 = Image.open(img2_path)
-
-# --- Display images ---
-col1, col2, col3 = st.columns([1, 2, 1])
+img1 = Image.open(os.path.join(IMAGE_FOLDER, "large-corporates-will-never-be-allowed-to-open-a-bank-in-india-n-vaghul.webp"))
+img2 = Image.open(os.path.join(IMAGE_FOLDER, "interior-design-bank-office-employees-600nw-2307454537.webp"))
+col1, col2 = st.columns([1,1])
 col1.image(img1, use_container_width=True)
 col2.image(img2, use_container_width=True)
-col3.write("")
 
-# --- Load and preprocess data ---
+# --- Load dataset ---
+@st.cache_data
 def load_data():
     return pd.read_csv("Customer-Churn-Records.csv")
 
+# --- Preprocess data ---
+@st.cache_data
 def preprocess_data(df):
-    y = df["Exited"]
-    X = df.drop("Exited", axis=1)
+    X = df.drop(['RowNumber', 'CustomerId', 'Surname', 'Exited', 
+                 'Complain', 'Satisfaction Score', 'Point Earned'], axis=1)
+    y = df['Exited']
     
-    # Encode categorical columns
-    categorical_cols = ["Geography", "Gender", "Card Type"]
-    X = pd.get_dummies(X, columns=categorical_cols, drop_first=True)
+    numeric_features = ['CreditScore', 'Age', 'Tenure', 'Balance', 
+                        'NumOfProducts', 'HasCrCard', 'IsActiveMember', 'EstimatedSalary']
+    categorical_features = ['Geography', 'Gender', 'Card Type']
     
-    preprocessor = None  # Placeholder if you want to save/use a preprocessor
-    return X, y, preprocessor
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', StandardScaler(), numeric_features),
+            ('cat', OneHotEncoder(drop='first'), categorical_features)
+        ]
+    )
+    
+    X_processed = preprocessor.fit_transform(X)
+    return X_processed, y, preprocessor
 
 # --- Train model ---
-def get_trained_model(X, y):
-    model = RandomForestClassifier(random_state=42)
+@st.cache_data
+def train_model(X, y):
+    model = XGBClassifier(objective="binary:logistic", eval_metric="auc", random_state=42)
     model.fit(X, y)
     return model
 
@@ -46,14 +53,14 @@ def get_trained_model(X, y):
 def main():
     st.title("💳 Customer Churn Prediction")
 
-    # Load and preprocess
+    # Load and preprocess data
     data = load_data()
-    X, y, preprocessor = preprocess_data(data)
+    X_processed, y, preprocessor = preprocess_data(data)
 
-    # Train model
-    model = get_trained_model(X, y)
+    # Train model (or load a saved model if you have one)
+    model = train_model(X_processed, y)
 
-    # Sidebar for user input
+    # Sidebar input
     st.sidebar.title("Enter Customer Information")
     credit_score = st.sidebar.slider("Credit Score", 300, 900, 600)
     age = st.sidebar.slider("Age", 18, 100, 30)
@@ -82,27 +89,20 @@ def main():
         "Card Type": card_type
     }])
 
-    # Encode categorical columns to match training
-    input_data = pd.get_dummies(input_data)
-    # Add missing columns with 0
-    for col in X.columns:
-        if col not in input_data.columns:
-            input_data[col] = 0
-    input_data = input_data[X.columns]  # reorder columns
+    # Transform and predict
+    input_processed = preprocessor.transform(input_data)
+    prediction = model.predict(input_processed)[0]
+    probability = model.predict_proba(input_processed)[0][1]
 
-    # Predict button
-    if st.button("Predict"):
-        prediction = model.predict(input_data)[0]
-        probability = model.predict_proba(input_data)[0][1]
-
-        st.subheader("Prediction Result")
-        st.write(f"**Predicted Value:** {'Churned' if prediction == 1 else 'Retained'}")
-        st.write(f"**Predicted Probability:** {probability:.2%} (Churn) | {1-probability:.2%} (Retain)")
+    # Display result
+    st.subheader("Prediction Result")
+    if prediction == 1:
+        st.error(f"Customer is likely to churn. Probability: {probability:.2%}")
+    else:
+        st.success(f"Customer is not likely to churn. Probability: {1-probability:.2%}")
 
 if __name__ == "__main__":
     main()
-
-
 
 
 
