@@ -1,15 +1,22 @@
 import streamlit as st
 import pandas as pd
 from PIL import Image
+import os
 
 # Set wide layout
 st.set_page_config(page_title="Customer Churn Prediction", layout="wide")
 
-# Load images
-img1 = Image.open("large-corporates-will-never-be-allowed-to-open-a-bank-in-india-n-vaghul.webp")
-img2 = Image.open("interior-design-bank-office-employees-600nw-2307454537.webp")
+# Define image folder
+IMAGE_FOLDER = "images"
 
-# Display images: first on left, second in center
+# Load images
+img1_path = os.path.join(IMAGE_FOLDER, "large-corporates-will-never-be-allowed-to-open-a-bank-in-india-n-vaghul.webp")
+img2_path = os.path.join(IMAGE_FOLDER, "interior-design-bank-office-employees-600nw-2307454537.webp")
+
+img1 = Image.open(img1_path)
+img2 = Image.open(img2_path)
+
+# Display images: first on left, second centered
 col1, col2, col3 = st.columns([1, 2, 1])
 col1.image(img1, use_column_width=True)
 col2.image(img2, use_column_width=True)
@@ -17,18 +24,15 @@ col3.write("")  # empty for spacing
 
 # --- Placeholder functions ---
 def load_data():
-    # Replace with actual loading code
     return pd.read_csv("Customer-Churn-Records.csv")
 
 def preprocess_data(df):
-    # Replace with actual preprocessing code
     X = df.drop("Exited", axis=1)
     y = df["Exited"]
-    preprocessor = None  # Replace with your trained preprocessor
+    preprocessor = None  # Replace with your actual preprocessor
     return X, y, preprocessor
 
 def get_trained_model(X, y):
-    # Replace with loading your trained model
     from sklearn.ensemble import RandomForestClassifier
     model = RandomForestClassifier()
     model.fit(X, y)
@@ -79,7 +83,7 @@ def main():
         if preprocessor:
             input_processed = preprocessor.transform(input_data)
         else:
-            input_processed = input_data  # Skip if no preprocessor
+            input_processed = input_data
 
         prediction = model.predict(input_processed)[0]
         probability = model.predict_proba(input_processed)[0][1]
