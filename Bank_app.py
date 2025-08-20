@@ -1,43 +1,37 @@
 import streamlit as st
 import pandas as pd
-from xgboost import XGBClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.compose import ColumnTransformer
+from PIL import Image
 
-# Load the dataset
-@st.cache_data
+# Set wide layout
+st.set_page_config(page_title="Customer Churn Prediction", layout="wide")
+
+# Load images
+img1 = Image.open("large-corporates-will-never-be-allowed-to-open-a-bank-in-india-n-vaghul.jpg")
+img2 = Image.open("interior-design-bank-office-employees-600nw-2307454537.jpg")
+
+# Display images: first on left, second in center
+col1, col2, col3 = st.columns([1, 2, 1])
+col1.image(img1, use_column_width=True)
+col2.image(img2, use_column_width=True)
+col3.write("")  # empty for spacing
+
+# --- Placeholder functions ---
 def load_data():
+    # Replace with actual loading code
     return pd.read_csv("Customer-Churn-Records.csv")
 
-# Preprocess the data
 def preprocess_data(df):
-    X = df.drop(['RowNumber', 'CustomerId', 'Surname', 'Exited',
-                 'Complain', 'Satisfaction Score', 'Point Earned'], axis=1)
-    y = df['Exited']
+    # Replace with actual preprocessing code
+    X = df.drop("Exited", axis=1)
+    y = df["Exited"]
+    preprocessor = None  # Replace with your trained preprocessor
+    return X, y, preprocessor
 
-    numeric_features = ['CreditScore', 'Age', 'Tenure', 'Balance',
-                        'NumOfProducts', 'HasCrCard', 'IsActiveMember',
-                        'EstimatedSalary']
-    categorical_features = ['Geography', 'Gender', 'Card Type']
-
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('num', StandardScaler(), numeric_features),
-            ('cat', OneHotEncoder(drop='first'), categorical_features)
-        ]
-    )
-
-    X_processed = preprocessor.fit_transform(X)
-    return X_processed, y, preprocessor
-
-# Train the model
-def train_model(X, y):
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
-    model = XGBClassifier(objective="binary:logistic", eval_metric="auc", random_state=42)
-    model.fit(X_train, y_train)
+def get_trained_model(X, y):
+    # Replace with loading your trained model
+    from sklearn.ensemble import RandomForestClassifier
+    model = RandomForestClassifier()
+    model.fit(X, y)
     return model
 
 # Main app
@@ -48,10 +42,10 @@ def main():
     data = load_data()
     X, y, preprocessor = preprocess_data(data)
 
-    # Train model
-    model = train_model(X, y)
+    # Load trained model
+    model = get_trained_model(X, y)
 
-    # Sidebar inputs
+    # Sidebar for input
     st.sidebar.title("Enter Customer Information")
     credit_score = st.sidebar.slider("Credit Score", 300, 900, 600)
     age = st.sidebar.slider("Age", 18, 100, 30)
@@ -80,21 +74,22 @@ def main():
         "Card Type": card_type
     }])
 
-    # Transform and predict
-    input_processed = preprocessor.transform(input_data)
-    prediction = model.predict(input_processed)
-    probability = model.predict_proba(input_processed)[0][1]
+    # Predict button
+    if st.button("Predict"):
+        if preprocessor:
+            input_processed = preprocessor.transform(input_data)
+        else:
+            input_processed = input_data  # Skip if no preprocessor
 
-    # Display prediction
-    st.subheader("Prediction Result")
-    if prediction[0] == 1:
-        st.error(f" Customer is likely to churn. Probability: {probability:.2%}")
-    else:
-        st.success(f" Customer is not likely to churn. Probability: {probability:.2%}")
+        prediction = model.predict(input_processed)[0]
+        probability = model.predict_proba(input_processed)[0][1]
+
+        st.subheader("Prediction Result")
+        st.write(f"**Predicted Value:** {'Churned' if prediction == 1 else 'Retained'}")
+        st.write(f"**Predicted Probability:** {probability:.2%} (Churn) | {1-probability:.2%} (Retain)")
 
 if __name__ == "__main__":
     main()
-
 
 
 
