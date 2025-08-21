@@ -1,4 +1,3 @@
-rt pandas as pd
 import streamlit as st
 import pandas as pd
 import pickle
@@ -26,31 +25,35 @@ def load_data():
 @st.cache_data
 def preprocess_data(df):
     X = df.drop([
-        'RowNumber', 'CustomerId', 'Surname', 'Exited', 
+        'RowNumber', 'CustomerId', 'Surname', 'Exited',
         'Complain', 'Satisfaction Score', 'Point Earned'
     ], axis=1)
     y = df['Exited']
-    
+
     numeric_features = [
-        'CreditScore', 'Age', 'Tenure', 'Balance', 
+        'CreditScore', 'Age', 'Tenure', 'Balance',
         'NumOfProducts', 'HasCrCard', 'IsActiveMember', 'EstimatedSalary'
     ]
     categorical_features = ['Geography', 'Gender', 'Card Type']
-    
+
     preprocessor = ColumnTransformer(
         transformers=[
             ('num', StandardScaler(), numeric_features),
             ('cat', OneHotEncoder(drop='first'), categorical_features)
         ]
     )
-    
+
     X_processed = preprocessor.fit_transform(X)
     return X_processed, y, preprocessor
 
 # --- Train model ---
-@st.cache_resource
+@st.cache_data
 def train_model(X, y):
-    model = XGBClassifier(objective="binary:logistic", eval_metric="auc", random_state=42)
+    model = XGBClassifier(
+        objective="binary:logistic",
+        eval_metric="auc",
+        random_state=42
+    )
     model.fit(X, y)
     return model
 
@@ -102,9 +105,9 @@ def main():
     # Display result
     st.subheader("Prediction Result")
     if prediction == 1:
-        st.error(f"⚠️ Customer is likely to churn. Probability: {probability:.2%}")
+        st.error(f"Customer is likely to churn. Probability: {probability:.2%}")
     else:
-        st.success(f"✅ Customer is not likely to churn. Probability: {(1 - probability):.2%}")
+        st.success(f"Customer is not likely to churn. Probability: {1 - probability:.2%}")
 
 if __name__ == "__main__":
     main()
