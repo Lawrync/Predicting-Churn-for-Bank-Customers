@@ -1,115 +1,58 @@
 import streamlit as st
-import pandas as pd
 import numpy as np
-import pickle
-from sklearn.preprocessing import StandardScaler
+import joblib
 
-# -----------------------------
-# Load Model and Scaler
-# -----------------------------
-@st.cache_resource
-def load_model():
-    with open("churn_model.pkl", "rb") as file:
-        model = pickle.load(file)
-    return model
+# Load model
+model = joblib.load("churn_model.pkl")
 
-@st.cache_resource
-def load_scaler():
-    with open("scaler.pkl", "rb") as file:
-        scaler = pickle.load(file)
-    return scaler
+st.title("🏦 Customer Churn Prediction")
 
-model = load_model()
-scaler = load_scaler()
-
-# -----------------------------
-# Streamlit UI
-# -----------------------------
-st.title("🏦 Bank Customer Churn Prediction App")
-st.write("Predict whether a customer is likely to **Churn (leave)** or **Stay (retain)**.")
-
-# -----------------------------
-# Input Fields
-# -----------------------------
-col1, col2 = st.columns(2)
+# Layout with two columns
+col1, col2 = st.columns([1, 2])
 
 with col1:
-    credit_score = st.number_input("Credit Score", min_value=300, max_value=900, value=650)
-    age = st.number_input("Age", min_value=18, max_value=100, value=35)
-    tenure = st.number_input("Tenure (Years with Bank)", min_value=0, max_value=20, value=5)
-    balance = st.number_input("Balance", min_value=0.0, value=50000.0)
+    st.subheader("User Inputs")
+    credit_score = st.number_input("Credit Score", 300, 900, 600)
+    age = st.number_input("Age", 18, 100, 30)
+    tenure = st.number_input("Tenure (Years)", 0, 20, 2)
+    balance = st.number_input("Balance", 0.0, 250000.0, 8000.0)
+    num_products = st.number_input("Number of Products", 1, 4, 1)
+    has_card = st.selectbox("Has Credit Card", ["Yes", "No"])
+    is_active = st.selectbox("Is Active Member", ["Yes", "No"])
+    salary = st.number_input("Estimated Salary", 0.0, 200000.0, 60000.0)
+    geography = st.selectbox("Geography", ["France", "Germany", "Spain"])
+    gender = st.selectbox("Gender", ["Male", "Female"])
 
+    if has_card == "Yes":
+        has_card = 1
+    else:
+        has_card = 0
+
+    if is_active == "Yes":
+        is_active = 1
+    else:
+        is_active = 0
+
+    # Prepare input
+    input_data = np.array([[credit_score, age, tenure, balance, num_products,
+                            has_card, is_active, salary]])
+    
 with col2:
-    num_of_products = st.selectbox("Number of Products", [1, 2, 3, 4])
-    has_cr_card = st.selectbox("Has Credit Card?", ["Yes", "No"])
-    is_active_member = st.selectbox("Is Active Member?", ["Yes", "No"])
-    estimated_salary = st.number_input("Estimated Salary", min_value=0.0, value=60000.0)
+    st.subheader("Prediction")
+    if st.button("Predict"):
+        prob = model.predict_proba(input_data)[0]
+        pred = model.predict(input_data)[0]
 
-# Categorical features
-geography = st.selectbox("Geography", ["France", "Spain", "Germany"])
-gender = st.selectbox("Gender", ["Male", "Female"])
+        if pred == 1:
+            result = "Churn"
+        else:
+            result = "Retain"
 
-# -----------------------------
-# Convert Inputs
-# -----------------------------
-has_cr_card = 1 if has_cr_card == "Yes" else 0
-is_active_member = 1 if is_active_member == "Yes" else 0
-gender = 1 if gender == "Male" else 0
-
-# Geography encoding (One-Hot)
-geo_france = 1 if geography == "France" else 0
-geo_spain = 1 if geography == "Spain" else 0
-geo_germany = 1 if geography == "Germany" else 0
-
-# -----------------------------
-# Prepare Input Data
-# -----------------------------
-input_data = np.array([[credit_score, age, tenure, balance,
-                        num_of_products, has_cr_card, is_active_member,
-                        estimated_salary, gender, geo_france,
-                        geo_spain, geo_germany]])
-
-input_data_scaled = scaler.transform(input_data)
-
-# -----------------------------
-# Prediction Button
-# -----------------------------
-if st.button("🔍 Predict Churn"):
-    prediction = model.predict(input_data_scaled)[0]
-    prob = model.predict_proba(input_data_scaled)[0]
-
-    retain_prob = round(prob[0] * 100, 2)
-    churn_prob = round(prob[1] * 100, 2)
-
-    # Display results
-    st.subheader("Prediction Result")
-    if prediction == 1:
-        st.error("⚠️ The customer is likely to **Churn**.")
-    else:
-        st.success("✅ The customer is likely to **Stay**.")
-
-    # Show probabilities
-    st.write(f"🟢 **Stay:** {retain_prob:.2f}%")
-    st.write(f"🔴 **Churn:** {churn_prob:.2f}%")
-
-    # Add interpretation
-    if churn_prob > 50:
-        st.warning("The customer is at **high risk** of leaving. Consider retention strategies.")
-    else:
-        st.info("The customer is **likely to stay**, but continue monitoring engagement.")
-
-# -----------------------------
-# Footer
-# -----------------------------
-st.markdown("---")
-st.caption("📊 Built with Streamlit | Customer Churn Prediction Model")
-
-# -----------------------------
-# Entry Point (Fix for SyntaxError)
-# -----------------------------
-if __name__ == "__main__":
-    st.write("✅ App loaded successfully. Ready for predictions!")
-__":
+        st.write(f"**Predicted Value:** {result}")
+        st.write(f"🔴 Probability (Churn): {prob[1]*100:.2f}%")
+        st.write(f"🟢 Probability (Retain): {prob[0]*100:.2f}%")
+        st.success(f"**Output: {result}**")
+_":
     main()
 ion==1 else 'Retain'}**")
 
