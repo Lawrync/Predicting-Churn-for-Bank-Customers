@@ -65,7 +65,7 @@ def main():
     data = load_data()
     X_processed, y, preprocessor = preprocess_data(data)
 
-    # Train model (or load a saved model if you have one)
+    # Train model 
     model = train_model(X_processed, y)
 
     # Sidebar input
