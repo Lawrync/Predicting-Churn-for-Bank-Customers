@@ -1,58 +1,113 @@
 import streamlit as st
-import numpy as np
-import joblib
+import pandas as pd
+import pickle
+from xgboost import XGBClassifier
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import train_test_split
+from PIL import Image
+import os
 
-# Load model
-model = joblib.load("churn_model.pkl")
+# --- Display images side by side ---
+IMAGE_FOLDER = "images"
+img1 = Image.open(os.path.join(IMAGE_FOLDER, "large-corporates-will-never-be-allowed-to-open-a-bank-in-india-n-vaghul.webp"))
+img2 = Image.open(os.path.join(IMAGE_FOLDER, "interior-design-bank-office-employees-600nw-2307454537.webp"))
+col1, col2 = st.columns([1,1])
+col1.image(img1, use_container_width=True)
+col2.image(img2, use_container_width=True)
 
-st.title("🏦 Customer Churn Prediction")
+# --- Load dataset ---
+@st.cache_data
+def load_data():
+    return pd.read_csv("Customer-Churn-Records.csv")
 
-# Layout with two columns
-col1, col2 = st.columns([1, 2])
+# --- Preprocess data ---
+@st.cache_data
+def preprocess_data(df):
+    X = df.drop(['RowNumber', 'CustomerId', 'Surname', 'Exited', 
+                 'Complain', 'Satisfaction Score', 'Point Earned'], axis=1)
+    y = df['Exited']
+    
+    numeric_features = ['CreditScore', 'Age', 'Tenure', 'Balance', 
+                        'NumOfProducts', 'HasCrCard', 'IsActiveMember', 'EstimatedSalary']
+    categorical_features = ['Geography', 'Gender', 'Card Type']
+    
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', StandardScaler(), numeric_features),
+            ('cat', OneHotEncoder(drop='first'), categorical_features)
+        ]
+    )
+    
+    X_processed = preprocessor.fit_transform(X)
+    return X_processed, y, preprocessor
 
-with col1:
-    st.subheader("User Inputs")
-    credit_score = st.number_input("Credit Score", 300, 900, 600)
-    age = st.number_input("Age", 18, 100, 30)
-    tenure = st.number_input("Tenure (Years)", 0, 20, 2)
-    balance = st.number_input("Balance", 0.0, 250000.0, 8000.0)
-    num_products = st.number_input("Number of Products", 1, 4, 1)
-    has_card = st.selectbox("Has Credit Card", ["Yes", "No"])
-    is_active = st.selectbox("Is Active Member", ["Yes", "No"])
-    salary = st.number_input("Estimated Salary", 0.0, 200000.0, 60000.0)
-    geography = st.selectbox("Geography", ["France", "Germany", "Spain"])
-    gender = st.selectbox("Gender", ["Male", "Female"])
+# --- Train model ---
+@st.cache_data
+def train_model(X, y):
+    model = XGBClassifier(objective="binary:logistic", eval_metric="auc", random_state=42)
+    model.fit(X, y)
+    return model
 
-    if has_card == "Yes":
-        has_card = 1
-    else:
-        has_card = 0
+# --- Main app ---
+def main():
+    st.title("💳 Customer Churn Prediction")
 
-    if is_active == "Yes":
-        is_active = 1
-    else:
-        is_active = 0
+    # Load and preprocess data
+    data = load_data()
+    X_processed, y, preprocessor = preprocess_data(data)
+
+    # Train model (or load a saved model if you have one)
+    model = train_model(X_processed, y)
+
+    # Sidebar input
+    st.sidebar.title("Enter Customer Information")
+    credit_score = st.sidebar.slider("Credit Score", 300, 900, 600)
+    age = st.sidebar.slider("Age", 18, 100, 30)
+    tenure = st.sidebar.slider("Tenure (Years with Bank)", 0, 10, 3)
+    balance = st.sidebar.number_input("Balance", 0.0, 250000.0, 50000.0, step=100.0)
+    num_products = st.sidebar.selectbox("Number of Products", [1, 2, 3, 4], index=0)
+    has_card = st.sidebar.selectbox("Has Credit Card?", ["Yes", "No"])
+    is_active = st.sidebar.selectbox("Is Active Member?", ["Yes", "No"])
+    salary = st.sidebar.number_input("Estimated Salary", 0.0, 200000.0, 60000.0, step=500.0)
+    geography = st.sidebar.selectbox("Geography", ["France", "Spain", "Germany"])
+    gender = st.sidebar.selectbox("Gender", ["Male", "Female"])
+    card_type = st.sidebar.selectbox("Card Type", ["DIAMOND", "GOLD", "PLATINUM", "SILVER"])
 
     # Prepare input
-    input_data = np.array([[credit_score, age, tenure, balance, num_products,
-                            has_card, is_active, salary]])
-    
-with col2:
-    st.subheader("Prediction")
-    if st.button("Predict"):
-        prob = model.predict_proba(input_data)[0]
-        pred = model.predict(input_data)[0]
+    input_data = pd.DataFrame([{
+        "CreditScore": credit_score,
+        "Age": age,
+        "Tenure": tenure,
+        "Balance": balance,
+        "NumOfProducts": num_products,
+        "HasCrCard": 1 if has_card == "Yes" else 0,
+        "IsActiveMember": 1 if is_active == "Yes" else 0,
+        "EstimatedSalary": salary,
+        "Geography": geography,
+        "Gender": gender,
+        "Card Type": card_type
+    }])
 
-        if pred == 1:
-            result = "Churn"
-        else:
-            result = "Retain"
+    # Transform and predict
+    input_processed = preprocessor.transform(input_data)
+    prediction = model.predict(input_processed)[0]
+    probability = model.predict_proba(input_processed)[0][1]
 
-        st.write(f"**Predicted Value:** {result}")
-        st.write(f"🔴 Probability (Churn): {prob[1]*100:.2f}%")
-        st.write(f"🟢 Probability (Retain): {prob[0]*100:.2f}%")
-        st.success(f"**Output: {result}**")
-_":
+    # Display result
+    st.subheader("Prediction Result")
+    if prediction == 1:
+        st.error(f"Customer is likely to churn. Probability: {probability:.2%}")
+    else:
+        st.success(f"Customer is not likely to churn. Probability: {1-probability:.2%}")
+
+if __name__ == "__main__":
+    main()
+f"**Final Output: {'Churn' if prediction==1 else 'Retain'}**")
+
+if __name__ == "__main__":
+    main()
+":
     main()
 ion==1 else 'Retain'}**")
 
