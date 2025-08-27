@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import pickle
 from xgboost import XGBClassifier
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
@@ -112,8 +111,10 @@ def main():
     # Final output message
     st.markdown(f"**Final Output: {'Churn' if prediction==1 else 'Retain'}**")
 
+
 if __name__ == "__main__":
     main()
+
    main()
 
 
