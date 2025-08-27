@@ -109,19 +109,12 @@ def main():
     else:
         st.success(f"Customer is not likely to churn. Probability: {1 - probability:.2%}")
 
+    # Final output message
+    st.markdown(f"**Final Output: {'Churn' if prediction==1 else 'Retain'}**")
+
 if __name__ == "__main__":
     main()
-f"**Final Output: {'Churn' if prediction==1 else 'Retain'}**")
-
-if __name__ == "__main__":
-    main()
-":
-    main()
-ion==1 else 'Retain'}**")
-
-# Run app
-if __name__ == "__main__":
-    main()
+   main()
 
 
 
