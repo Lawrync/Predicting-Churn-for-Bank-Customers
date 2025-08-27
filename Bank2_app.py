@@ -6,10 +6,13 @@ from sklearn.compose import ColumnTransformer
 from PIL import Image
 import os
 
-# --- Display only one image ---
+# --- Display one image (centered & not full page) ---
 IMAGE_FOLDER = "images"
 img1 = Image.open(os.path.join(IMAGE_FOLDER, "large-corporates-will-never-be-allowed-to-open-a-bank-in-india-n-vaghul.webp"))
-st.image(img1, use_container_width=True)
+
+col1, col2, col3 = st.columns([1, 2, 1])  # center the image
+with col2:
+    st.image(img1, width=350)  # fixed width so it looks neat
 
 # --- Load dataset ---
 @st.cache_data
@@ -63,7 +66,7 @@ def main():
     # Train model 
     model = train_model(X_processed, y)
 
-    # Sidebar input (two columns)
+    # Sidebar input (split into 2 columns)
     st.sidebar.title("Enter Customer Information")
     col1, col2 = st.sidebar.columns(2)
 
@@ -99,17 +102,20 @@ def main():
 
     # Transform and predict
     input_processed = preprocessor.transform(input_data)
-    pred = model.predict(input_processed)[0]
-    proba = model.predict_proba(input_processed)[0][1]
+    prediction = model.predict(input_processed)[0]
+    probability = model.predict_proba(input_processed)[0][1]
 
-    # --- Show result ---
+    # Display result
     st.subheader("✅ Prediction Result")
-    st.write("**Churn Prediction:**", "🔴 Yes" if pred == 1 else "🟢 No")
-    st.write("**Churn Probability:**", f"{proba:.2%}")
+    if prediction == 1:
+        st.error(f"Customer is likely to churn. Probability: {probability:.2%}")
+    else:
+        st.success(f"Customer is not likely to churn. Probability: {1 - probability:.2%}")
 
     # Final output message
-    st.markdown(f"**Final Output: {'Churn' if pred==1 else 'Retain'}**")
+    st.markdown(f"**Final Output: {'Churn' if prediction==1 else 'Retain'}**")
 
 
 if __name__ == "__main__":
     main()
+
