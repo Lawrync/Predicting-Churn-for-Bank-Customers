@@ -1,75 +1,115 @@
-# ==== Imports ====
 import streamlit as st
 import pandas as pd
-import joblib  # <-- REQUIRED
-import numpy as np
+from xgboost import XGBClassifier
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from PIL import Image
+import os
 
-# ==== Page setup ====
-st.set_page_config(page_title="Customer Churn Predictor", layout="centered")
-st.title("📊 Customer Churn Prediction App")
-st.markdown("""
-This app uses a tuned **XGBoost model** to predict whether a bank customer is likely to churn.  
-Enter the customer details below and click **Predict**.
-""")
+# --- Display only one image ---
+IMAGE_FOLDER = "images"
+img1 = Image.open(os.path.join(IMAGE_FOLDER, "large-corporates-will-never-be-allowed-to-open-a-bank-in-india-n-vaghul.webp"))
+st.image(img1, use_container_width=True)
 
-# ==== Load saved preprocessor & model (with clear error if missing) ====
-try:
-    preprocessor = joblib.load("preprocessor.pkl")
-    model = joblib.load("xgb_churn_model.pkl")
-except Exception as e:
-    st.error(
-        "Failed to load required files. Make sure **preprocessor.pkl** and **xgb_churn_model.pkl** "
-        "are in the same folder as this app.\n\n"
-        f"Details: {e}"
+# --- Load dataset ---
+@st.cache_data
+def load_data():
+    return pd.read_csv("Customer-Churn-Records.csv")
+
+# --- Preprocess data ---
+@st.cache_data
+def preprocess_data(df):
+    X = df.drop([
+        'RowNumber', 'CustomerId', 'Surname', 'Exited',
+        'Complain', 'Satisfaction Score', 'Point Earned'
+    ], axis=1)
+    y = df['Exited']
+
+    numeric_features = [
+        'CreditScore', 'Age', 'Tenure', 'Balance',
+        'NumOfProducts', 'HasCrCard', 'IsActiveMember', 'EstimatedSalary'
+    ]
+    categorical_features = ['Geography', 'Gender', 'Card Type']
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', StandardScaler(), numeric_features),
+            ('cat', OneHotEncoder(drop='first'), categorical_features)
+        ]
     )
-    st.stop()
 
-# ==== Input form ====
-with st.form("churn_form"):
-    credit_score = st.number_input("Credit Score", min_value=350, max_value=850, value=600)
-    age = st.number_input("Age", min_value=18, max_value=92, value=30)
-    tenure = st.number_input("Tenure (Years with Bank)", min_value=0, max_value=10, value=2)
-    balance = st.number_input("Balance", min_value=0.0, max_value=250000.0, value=8000.0, step=100.0)
-    num_products = st.selectbox("Number of Products", [1, 2, 3, 4], index=1)
-    has_card = st.radio("Has Credit Card?", [0, 1], index=1)
-    is_active = st.radio("Is Active Member?", [0, 1], index=1)
-    salary = st.number_input("Estimated Salary", min_value=0.0, max_value=200000.0, value=60000.0, step=500.0)
+    X_processed = preprocessor.fit_transform(X)
+    return X_processed, y, preprocessor
 
-    geography = st.selectbox("Geography", ["France", "Spain", "Germany"])
-    gender = st.selectbox("Gender", ["Female", "Male"])
-    card_type = st.selectbox("Card Type", ["SILVER", "GOLD", "PLATINUM", "DIAMOND"])
+# --- Train model ---
+@st.cache_data
+def train_model(X, y):
+    model = XGBClassifier(
+        objective="binary:logistic",
+        eval_metric="auc",
+        random_state=42
+    )
+    model.fit(X, y)
+    return model
 
-    submitted = st.form_submit_button("🔮 Predict Churn")
+# --- Main app ---
+def main():
+    st.title("💳 Customer Churn Prediction")
 
-# ==== Prediction ====
-if submitted:
-    # Prepare data
-    sample = {
+    # Load and preprocess data
+    data = load_data()
+    X_processed, y, preprocessor = preprocess_data(data)
+
+    # Train model 
+    model = train_model(X_processed, y)
+
+    # Sidebar input (two columns)
+    st.sidebar.title("Enter Customer Information")
+    col1, col2 = st.sidebar.columns(2)
+
+    with col1:
+        credit_score = st.slider("Credit Score", 300, 900, 600)
+        age = st.slider("Age", 18, 100, 30)
+        tenure = st.slider("Tenure (Years)", 0, 10, 3)
+        balance = st.number_input("Balance", 0.0, 250000.0, 50000.0, step=100.0)
+        num_products = st.selectbox("Products", [1, 2, 3, 4], index=0)
+
+    with col2:
+        has_card = st.selectbox("Has Card?", ["Yes", "No"])
+        is_active = st.selectbox("Active Member?", ["Yes", "No"])
+        salary = st.number_input("Salary", 0.0, 200000.0, 60000.0, step=500.0)
+        geography = st.selectbox("Geography", ["France", "Spain", "Germany"])
+        gender = st.selectbox("Gender", ["Male", "Female"])
+        card_type = st.selectbox("Card Type", ["DIAMOND", "GOLD", "PLATINUM", "SILVER"])
+
+    # Prepare input
+    input_data = pd.DataFrame([{
         "CreditScore": credit_score,
         "Age": age,
         "Tenure": tenure,
         "Balance": balance,
         "NumOfProducts": num_products,
-        "HasCrCard": has_card,
-        "IsActiveMember": is_active,
+        "HasCrCard": 1 if has_card == "Yes" else 0,
+        "IsActiveMember": 1 if is_active == "Yes" else 0,
         "EstimatedSalary": salary,
         "Geography": geography,
         "Gender": gender,
         "Card Type": card_type
-    }
-    df = pd.DataFrame([sample])
+    }])
 
-    # Transform + predict
-    try:
-        X = preprocessor.transform(df)
-        proba = float(model.predict_proba(X)[0][1])
-        pred = int(model.predict(X)[0])
-    except Exception as e:
-        st.error(f"Prediction failed. Check that the preprocessor matches these input columns. Details: {e}")
-        st.stop()
+    # Transform and predict
+    input_processed = preprocessor.transform(input_data)
+    pred = model.predict(input_processed)[0]
+    proba = model.predict_proba(input_processed)[0][1]
 
-    # Show result
+    # --- Show result ---
     st.subheader("✅ Prediction Result")
     st.write("**Churn Prediction:**", "🔴 Yes" if pred == 1 else "🟢 No")
     st.write("**Churn Probability:**", f"{proba:.2%}")
 
+    # Final output message
+    st.markdown(f"**Final Output: {'Churn' if pred==1 else 'Retain'}**")
+
+
+if __name__ == "__main__":
+    main()
