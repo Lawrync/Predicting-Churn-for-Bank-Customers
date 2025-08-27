@@ -6,7 +6,7 @@ from sklearn.compose import ColumnTransformer
 from PIL import Image
 import os
 
-# --- Display images side by side ---
+#  Display images side by side 
 IMAGE_FOLDER = "images"
 img1 = Image.open(os.path.join(IMAGE_FOLDER, "large-corporates-will-never-be-allowed-to-open-a-bank-in-india-n-vaghul.webp"))
 img2 = Image.open(os.path.join(IMAGE_FOLDER, "interior-design-bank-office-employees-600nw-2307454537.webp"))
@@ -113,7 +113,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+     main()
 
    main()
 
