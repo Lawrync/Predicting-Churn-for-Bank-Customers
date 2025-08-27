@@ -66,21 +66,21 @@ def main():
     # Train model 
     model = train_model(X_processed, y)
 
-    # Sidebar input (split into 2 columns)
+       # Sidebar input (split into 2 columns)
     st.sidebar.title("Enter Customer Information")
     col1, col2 = st.sidebar.columns(2)
 
     with col1:
-        credit_score = st.slider("Credit Score", 300, 900, 600)
-        age = st.slider("Age", 18, 100, 30)
-        tenure = st.slider("Tenure (Years)", 0, 10, 3)
-        balance = st.number_input("Balance", 0.0, 250000.0, 50000.0, step=100.0)
+        credit_score = st.number_input("Credit Score", min_value=300, max_value=900, value=600, step=1)
+        age = st.number_input("Age", min_value=18, max_value=100, value=30, step=1)
+        tenure = st.number_input("Tenure (Years)", min_value=0, max_value=10, value=3, step=1)
+        balance = st.number_input("Balance", min_value=0.0, max_value=250000.0, value=50000.0, step=100.0)
         num_products = st.selectbox("Products", [1, 2, 3, 4], index=0)
 
     with col2:
         has_card = st.selectbox("Has Card?", ["Yes", "No"])
         is_active = st.selectbox("Active Member?", ["Yes", "No"])
-        salary = st.number_input("Salary", 0.0, 200000.0, 60000.0, step=500.0)
+        salary = st.number_input("Salary", min_value=0.0, max_value=200000.0, value=60000.0, step=500.0)
         geography = st.selectbox("Geography", ["France", "Spain", "Germany"])
         gender = st.selectbox("Gender", ["Male", "Female"])
         card_type = st.selectbox("Card Type", ["DIAMOND", "GOLD", "PLATINUM", "SILVER"])
