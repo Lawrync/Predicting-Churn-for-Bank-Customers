@@ -6,6 +6,10 @@ from sklearn.compose import ColumnTransformer
 from PIL import Image
 import os
 
+# --- Display images side by side ---
+IMAGE_FOLDER = "images"
+img1 = Image.open(os.path.join(IMAGE_FOLDER, "large-corporates-will-never-be-allowed-to-open-a-bank-in-india-n-vaghul.webp"))
+img2 = Image.open(os.path.join(IMAGE_FOLDER, "interior-design-bank-office-employees-600nw-2307454537.webp"))
 col1, col2 = st.columns([1, 1])
 col1.image(img1, use_container_width=True)
 col2.image(img2, use_container_width=True)
