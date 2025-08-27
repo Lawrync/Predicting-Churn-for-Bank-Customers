@@ -1,23 +1,28 @@
+# ==== Imports ====
 import streamlit as st
 import pandas as pd
-from xgboost import XGBClassifier
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.compose import ColumnTransformer
-from PIL import Image
-import os
-# ==== Load saved preprocessor & model ====
-# (make sure preprocessor.pkl and xgb_churn_model.pkl are in the same folder)
-preprocessor = joblib.load("preprocessor.pkl")
-model = joblib.load("xgb_churn_model.pkl")
+import joblib  # <-- REQUIRED
+import numpy as np
 
-# ==== Streamlit App ====
+# ==== Page setup ====
 st.set_page_config(page_title="Customer Churn Predictor", layout="centered")
 st.title("📊 Customer Churn Prediction App")
-
 st.markdown("""
 This app uses a tuned **XGBoost model** to predict whether a bank customer is likely to churn.  
 Enter the customer details below and click **Predict**.
 """)
+
+# ==== Load saved preprocessor & model (with clear error if missing) ====
+try:
+    preprocessor = joblib.load("preprocessor.pkl")
+    model = joblib.load("xgb_churn_model.pkl")
+except Exception as e:
+    st.error(
+        "Failed to load required files. Make sure **preprocessor.pkl** and **xgb_churn_model.pkl** "
+        "are in the same folder as this app.\n\n"
+        f"Details: {e}"
+    )
+    st.stop()
 
 # ==== Input form ====
 with st.form("churn_form"):
@@ -52,15 +57,19 @@ if submitted:
         "Gender": gender,
         "Card Type": card_type
     }
-
     df = pd.DataFrame([sample])
 
     # Transform + predict
-    X = preprocessor.transform(df)
-    proba = model.predict_proba(X)[0][1]
-    pred = model.predict(X)[0]
+    try:
+        X = preprocessor.transform(df)
+        proba = float(model.predict_proba(X)[0][1])
+        pred = int(model.predict(X)[0])
+    except Exception as e:
+        st.error(f"Prediction failed. Check that the preprocessor matches these input columns. Details: {e}")
+        st.stop()
 
     # Show result
     st.subheader("✅ Prediction Result")
-    st.write("**Churn Prediction:**", "🔴 Yes" if pred else "🟢 No")
+    st.write("**Churn Prediction:**", "🔴 Yes" if pred == 1 else "🟢 No")
     st.write("**Churn Probability:**", f"{proba:.2%}")
+
